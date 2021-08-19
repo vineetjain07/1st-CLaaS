@@ -1,4 +1,4 @@
-\m4_TLV_version 1d --noline --debugSigs --compiler verilator: tl-x.org
+\m4_TLV_version 1d --fmtFlatSignals --bestsv --noline --debugSigs --compiler verilator: tl-x.org
 \SV
 // -----------------------------------------------------------------------------
 // Copyright (c) 2019, Steven F. Hoover
@@ -78,11 +78,11 @@ m4+definitions(['
    m4_def(EXT_M, 0)
    m4_def(EXT_F, 0)
    m4_def(EXT_B, 0)
-   m4_def(NUM_CORES, 5)
+   m4_def(NUM_CORES, 2)
    m4_def(NUM_VCS, 2)
    m4_def(NUM_PRIOS, 2)
    m4_def(MAX_PACKET_SIZE, 8)
-   m4_def(soft_reset, 1'b1)
+   m4_def(soft_reset, 1'b0)
    m4_def(cpu_blocked, 1'b0)
    m4_def(BRANCH_PRED, two_bit)
    m4_def(EXTRA_REPLAY_BUBBLE, 0)
@@ -103,7 +103,7 @@ m4+definitions(['
    m4_def(MEM_WR_STAGE, 3)
    m4_def(LD_RETURN_ALIGN, 4)
 
-   m4_define(['M4_XILINX'], 0)
+   m4_define(['M4_XILINX'], 1)
 
    m4_include_url(['https://raw.githubusercontent.com/stevehoover/tlv_flow_lib/7a2b37cc0ccd06bc66984c37e17ceb970fd6f339/pipeflow_lib.tlv'])
    m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_flow_lib/5a8c0387be80b2deccfcd1506299b36049e0663e/arrays.tlv'])
@@ -143,11 +143,9 @@ m4_define(['m4_kernel_module_def'], ['
    (
        input wire                       clk,
        input wire                       reset,
-
        output wire                      in_ready,
        input wire                       in_avail,
        input wire  [C_DATA_WIDTH-1:0]   in_data,
-       
        input wire                       out_ready,
        output wire                      out_avail,
        output wire [C_DATA_WIDTH-1:0]   out_data
@@ -231,8 +229,7 @@ m4_kernel_module_def($1)
             ?$m4_strip_prefix(/_entries)_rd_en
                /_trans
                m4_ifelse(/_trans, [''], [''], ['   '])['']m4_rd_data_sig = /_top/_entries[$_rd_addr]/_trans>>m4_stage_eval(1 - @_rd)$_wr_data;
-            
-            
+      
 \TLV imem()
    // WARP-V configured to use this for IMem, though
    // IMem and read defined elsewhere. This just hooks up $raw.
@@ -240,9 +237,74 @@ m4_kernel_module_def($1)
       /instr
          @m4_eval(M4_FETCH_STAGE + 1)
             ?$fetch
+               // IMem
                $raw[M4_INSTR_RANGE] = /top/core|imem>>m4_align(2, M4_FETCH_STAGE + 1)$rd_instr;
-      
-      
+               
+\TLV xilinx_bram(data_width, $_wrdata, $_wraddr, $_wren, $_rddata, $_rden, $_rdaddr)
+   m4_pushdef(['m4_we'], m4_ifelse(m4_eval(data_width > 36), 1, 8, m4_eval(data_width > 18), 1, 4, m4_eval(data_width > 9), 1, 2, 1))
+   \SV_plus
+      logic dbiterrb, sbiterrb, injectdbiterra, injectsbiterra, regceb, sleep, wea;
+      xpm_memory_sdpram #(
+         .ADDR_WIDTH_A(32),               // DECIMAL
+         .ADDR_WIDTH_B(32),               // DECIMAL
+         .AUTO_SLEEP_TIME(0),            // DECIMAL
+         .BYTE_WRITE_WIDTH_A(32),        // DECIMAL
+         .CLOCKING_MODE("common_clock"), // String
+         .ECC_MODE("no_ecc"),            // String
+         .MEMORY_INIT_FILE("none"),      // String
+         .MEMORY_INIT_PARAM("0"),        // String
+         .MEMORY_OPTIMIZATION("true"),   // String
+         .MEMORY_PRIMITIVE("block"),      // String
+         .MEMORY_SIZE(1024),             // DECIMAL
+         .MESSAGE_CONTROL(1),            // DECIMAL
+         .READ_DATA_WIDTH_B(32),         // DECIMAL
+         .READ_LATENCY_B(1),             // DECIMAL
+         .READ_RESET_VALUE_B("0"),       // String
+         .RST_MODE_A("SYNC"),            // String
+         .RST_MODE_B("SYNC"),            // String
+         .USE_EMBEDDED_CONSTRAINT(0),    // DECIMAL
+         .USE_MEM_INIT(0),               // DECIMAL
+         .WAKEUP_TIME("disable_sleep"),  // String
+         .WRITE_DATA_WIDTH_A(32),        // DECIMAL
+         .WRITE_MODE_B("no_change")      // String
+      )   xpm_memory_sdpram_inst (
+         .dbiterrb(dbiterrb),             // 1-bit output: Status signal to indicate double bit error occurrence
+                                          // on the data output of port B.
+         .doutb(>>1$['']$_rddata),                   // READ_DATA_WIDTH_B-bit output: Data output for port B read operations.
+         .sbiterrb(sbiterrb),             // 1-bit output: Status signal to indicate single bit error occurrence
+                                          // on the data output of port B.
+         .addra($_wraddr),                   // ADDR_WIDTH_A-bit input: Address for port A write operations.
+         .addrb($_rdaddr),                   // ADDR_WIDTH_B-bit input: Address for port B read operations.
+         .clka(*clk),                     // 1-bit input: Clock signal for port A. Also clocks port B when
+                                          // parameter CLOCKING_MODE is "common_clock".
+         .clkb(*clk),                     // 1-bit input: Clock signal for port B when parameter CLOCKING_MODE is
+                                          // "independent_clock". Unused when parameter CLOCKING_MODE is
+                                          // "common_clock"
+         .dina($_wrdata),                     // WRITE_DATA_WIDTH_A-bit input: Data input for port A write operations.
+         .ena($_wren),                       // 1-bit input: Memory enable signal for port A. Must be high on clock
+                                          // cycles when write operations are initiated. Pipelined internally.
+         .enb($_rden),                       // 1-bit input: Memory enable signal for port B. Must be high on clock
+                                          // cycles when read operations are initiated. Pipelined internally.
+         .injectdbiterra(1'b0), // 1-bit input: Controls double bit error injection on input data when
+                                          // ECC enabled (Error injection capability is not available in
+                                          // "decode_only" mode).
+         .injectsbiterra(1'b0), // 1-bit input: Controls single bit error injection on input data when
+                                          // ECC enabled (Error injection capability is not available in
+                                          // "decode_only" mode).
+         .regceb(1'b1),                 // 1-bit input: Clock Enable for the last register stage on the output
+                                          // data path.
+         .rstb(*reset),                     // 1-bit input: Reset signal for the final port B output register stage.
+                                          // Synchronously resets output port doutb to the value specified by
+                                          // parameter READ_RESET_VALUE_B.
+         .sleep(1'b0),                   // 1-bit input: sleep signal to enable the dynamic power saving feature.
+         .wea(1'b1)                        // WRITE_DATA_WIDTH_A-bit input: Write enable vector for port A input
+                                          // data port dina. 1 bit wide when word-wide writes are used. In
+                                          // byte-wide write configurations, each bit controls the writing one
+                                          // byte of dina to address addra. For example, to synchronously write
+                                          // only bits [15-8] of dina when WRITE_DATA_WIDTH_A is 32, wea would be
+                                          // 4'b0010.
+      );
+   
 \SV
 m4_makerchip_module_with_random_kernel_tb(manycore, ['assign passed = cyc_cnt > 20;']) // Provide the name the top module for 1st CLaaS in $3 param
 m4+definitions([''])  // A hack to reset line alignment to address the fact that the above macro is multi-line. 
@@ -331,7 +393,7 @@ m4+definitions([''])  // A hack to reset line alignment to address the fact that
                $addr[M4_IMEM_INDEX_RANGE] = $in_data[(1 * M4_INSTR_CNT) + M4_IMEM_INDEX_MAX:(1 * M4_INSTR_CNT)];
                $instr[M4_INSTR_RANGE] = $in_data[(3 * M4_INSTR_CNT) - 1: 2 * M4_INSTR_CNT];
    
-   /core[1:0]
+   /M4_CORE_HIER
       // Mux from |kernel_in1@1 and |fetch@M4_FETCH_STAGE. TODO: No exclusivity check.
       |imem
          @1
@@ -346,6 +408,12 @@ m4+definitions([''])  // A hack to reset line alignment to address the fact that
          
    m4_ifelse_block(M4_XILINX, 0, ['
    m4+array2r2w(/top, /imem_entry, /core, |imem, @1, $wr_en, $addr, $instr[M4_INSTR_RANGE], /core, |imem, @1, $rd_en, $addr, $rd_instr[M4_INSTR_RANGE])
+   '], ['
+   /M4_CORE_HIER
+      |imem
+         @1
+            // TODO: I'm not sure about the timing. I'm assuming inputs are a cycle before outputs.
+            m4+xilinx_bram(M4_INSTR_CNT, $instr, $addr, $wr_en, $rd_instr[M4_INSTR_RANGE], $accepted && $rd_en, $addr)
    '])
    // Recirculate rd_data (as the bp_pipeline would naturally have done the cycle before).
    |kernel2
