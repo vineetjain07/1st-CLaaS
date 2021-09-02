@@ -59,7 +59,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sys/stat.h>
 #include <CL/opencl.h>
 #include <CL/cl_ext.h>
-#include "xclhal2.h"
+//#include "xclhal2.h"
 
 #include "kernel.h"
 
@@ -217,23 +217,8 @@ void HW_Kernel::initialize_kernel(const char *xclbin, const char *kernel_name, i
   //
   // Create structs to define memory bank mapping
 
-  cl_mem_ext_ptr_t mem_ext;
-  mem_ext.obj = NULL;
-  mem_ext.param = kernel;
-  mem_ext.flags = 2;
-  cl_mem_ext_ptr_t mem_ext_2;
-  mem_ext_2.obj = NULL;
-  mem_ext_2.param = kernel;
-  mem_ext_2.flags = 2;
-
-  read_mem  = clCreateBuffer(context, CL_MEM_READ_ONLY ,  sizeof(int) * memory_size, &mem_ext, &err);
-  if (err != CL_SUCCESS) {
-      std::cout << "Return code for clCreateBuffer flags=" << mem_ext.flags << ": " << err << std::endl;
-    }
-  write_mem = clCreateBuffer(context, CL_MEM_WRITE_ONLY,  sizeof(int) * memory_size, &mem_ext_2, &err);
-  if (err != CL_SUCCESS) {
-      std::cout << "Return code for clCreateBuffer flags=" << mem_ext_2.flags << ": " << err << std::endl;
-    }
+  read_mem  = clCreateBuffer(context, CL_MEM_READ_ONLY ,  sizeof(int) * memory_size, NULL, &err);
+  write_mem = clCreateBuffer(context, CL_MEM_WRITE_ONLY,  sizeof(int) * memory_size, NULL, &err);
 
   if (!(write_mem) || !(read_mem)) {
     perror("Error: Failed to allocate device memory!\nTest failed\n");
@@ -326,14 +311,14 @@ void HW_Kernel::start_kernel() {
   if (err) {
       printf("ERROR: Failed to execute kernel! %d\n", err);
       printf("ERROR: Test failed\n");
-      return EXIT_FAILURE;
+      return;
   }
 
   status = 0;
 }
 
 void HW_Kernel::read_kernel_data(int h_a_output[], int data_size) {
-  int err;
+  int err=0;
   cl_event readevent;
 
   clFinish(commands);
@@ -375,11 +360,4 @@ void HW_Kernel::clean_kernel() {
   clReleaseKernel(kernel);
   clReleaseCommandQueue(commands);
   clReleaseContext(context);
-  if (check_status) {
-        printf("ERROR: Test failed\n");
-        return EXIT_FAILURE;
-    } else {
-        printf("INFO: Test completed successfully.\n");
-        return EXIT_SUCCESS;
-    }
 }

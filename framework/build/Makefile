@@ -430,10 +430,10 @@ TARGET_DEVICE=xilinx:aws-vu9p-f1:4ddr-xpr-2pr:4.0
 
 REPORT=
 ifeq ($(BUILD_TARGET),hw)
-REPORT= -R2 --report_level system
+REPORT=
 else
 ifeq ($(BUILD_TARGET),hw_emu)
-REPORT= -R2 --report_level estimate
+REPORT=
 endif
 endif
 
