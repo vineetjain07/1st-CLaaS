@@ -215,10 +215,25 @@ void HW_Kernel::initialize_kernel(const char *xclbin, const char *kernel_name, i
   // This must be modified by the user if the number (or name) of the arguments is different from this
   // application
   //
-  //read_mem  = clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(int) * memory_size, NULL, NULL);
-  //write_mem = read_mem;
-  read_mem  = clCreateBuffer(context, CL_MEM_READ_ONLY ,  sizeof(int) * memory_size, NULL, NULL);  // TODO: Fix memory_size.
-  write_mem = clCreateBuffer(context, CL_MEM_WRITE_ONLY,  sizeof(int) * memory_size, NULL, NULL);
+  // Create structs to define memory bank mapping
+
+  cl_mem_ext_ptr_t mem_ext;
+  mem_ext.obj = NULL;
+  mem_ext.param = kernel;
+  mem_ext.flags = 2;
+  cl_mem_ext_ptr_t mem_ext_2;
+  mem_ext_2.obj = NULL;
+  mem_ext_2.param = kernel;
+  mem_ext_2.flags = 2;
+
+  read_mem  = clCreateBuffer(context, CL_MEM_READ_ONLY ,  sizeof(int) * memory_size, &mem_ext, &err);
+  if (err != CL_SUCCESS) {
+      std::cout << "Return code for clCreateBuffer flags=" << mem_ext.flags << ": " << err << std::endl;
+    }
+  write_mem = clCreateBuffer(context, CL_MEM_WRITE_ONLY,  sizeof(int) * memory_size, &mem_ext_2, &err);
+  if (err != CL_SUCCESS) {
+      std::cout << "Return code for clCreateBuffer flags=" << mem_ext_2.flags << ": " << err << std::endl;
+    }
 
   if (!(write_mem) || !(read_mem)) {
     perror("Error: Failed to allocate device memory!\nTest failed\n");
@@ -250,7 +265,7 @@ void HW_Kernel::write_kernel_data(double h_a_input[], int data_size){
   }
 }
 
-// TODO: Experimental WIP
+// TODO: Experimental WIP (Uses presently)
 void HW_Kernel::writeKernelData(void * input, int data_size, int resp_data_size) {
   int err;
   err = clEnqueueWriteBuffer(commands, read_mem, CL_TRUE, 0, data_size, input, 0, NULL, NULL);
@@ -300,14 +315,19 @@ void HW_Kernel::write_kernel_data(input_struct * input, int data_size) {
 
 void HW_Kernel::start_kernel() {
   int err;
-  err = clEnqueueTask(commands, kernel, 0, NULL, NULL);
-  if (err) {
-    perror("Error: Failed to execute kernel!\nTest failed\n");
-    return;
-  }
+  size_t global[1];
+  size_t local[1];
+  // Execute the kernel over the entire range of our 1d input data set
+  // using the maximum number of work group items for this device
 
-  // Read back the results from the device to verify the output
-  //
+  global[0] = 1;
+  local[0] = 1;
+  err = clEnqueueNDRangeKernel(commands, kernel, 1, NULL, (size_t*)&global, (size_t*)&local, 0, NULL, NULL);
+  if (err) {
+      printf("ERROR: Failed to execute kernel! %d\n", err);
+      printf("ERROR: Test failed\n");
+      return EXIT_FAILURE;
+  }
 
   status = 0;
 }
@@ -323,9 +343,9 @@ void HW_Kernel::read_kernel_data(int h_a_output[], int data_size) {
     h_a_output[i] = i;
   }
   */
-  err |= clSetKernelArg(kernel, 0, sizeof(uint), &data_size);
+  // err |= clSetKernelArg(kernel, 0, sizeof(uint), &data_size);
 
-  err = clEnqueueReadBuffer(commands, write_mem, CL_TRUE, 0, data_size, h_a_output, 0, NULL, &readevent);
+  err |= clEnqueueReadBuffer(commands, write_mem, CL_TRUE, 0, data_size, h_a_output, 0, NULL, &readevent);
 
   if (err != CL_SUCCESS) {
     perror("Error: Failed to read output array h_a_output!\nTest failed\n");
@@ -333,15 +353,33 @@ void HW_Kernel::read_kernel_data(int h_a_output[], int data_size) {
   }
 
   clWaitForEvents(1, &readevent);
+
+  //results
+
+  // for (cl_uint i = 0; i < ROWS; i++) {
+  //       if ((h_data[i] + 1) != h_read_mem_output[i]) {
+  //           printf("ERROR in warpv::m00_axi - array index %d (host addr 0x%03x) - input=%d (0x%x), output=%d (0x%x)\n", i, i*4, h_data[i], h_data[i], h_read_mem_output[i], h_read_mem_output[i]);
+  //           check_status = 1;
+  //       }
+  //     //  printf("i=%d, input=%d, output=%d\n", i,  h_read_mem_input[i], h_read_mem_output[i]);
+  //   }
 }
 
 void HW_Kernel::clean_kernel() {
   // This has to be modified by the user if the number (or name) of arguments is different
   clReleaseMemObject(read_mem);
   clReleaseMemObject(write_mem);
-
+  // free(h_read_mem_output);
+  // free(h_data);
   clReleaseProgram(program);
   clReleaseKernel(kernel);
   clReleaseCommandQueue(commands);
   clReleaseContext(context);
+  if (check_status) {
+        printf("ERROR: Test failed\n");
+        return EXIT_FAILURE;
+    } else {
+        printf("INFO: Test completed successfully.\n");
+        return EXIT_SUCCESS;
+    }
 }
