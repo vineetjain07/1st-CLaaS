@@ -102,7 +102,7 @@
 #             sw: software-only with no kernel behavior available.
 #            TARGET is downgraded automatically based on the platform.
 #     PREBUILT=[true] or default to false behavior. True to use the prebuilt files in the repository, rather than building.
-#     WAVES=[true] or default to false behavior. True to generate waveforms. (xocc )
+#     WAVES=[true] or default to false behavior. True to generate waveforms. (VPP )
 #     VALGRIND=[true] or default to false behavior. True to use Valgrind to identify memory leaks in the host application.
 #     NOHUP=true: Can be used with 'launch' target to launch in background and stay running after the shell exits. (This is implied by 'make live').
 #     LAUNCH_ID: Used by launch, live, and dead targets. If unassigned, these targets assume a single running microservice.
@@ -363,7 +363,7 @@ S3_LOGS_KEY=$(KERNEL_NAME)_log
 S3_DCP_KEY=$(KERNEL_NAME)_dcp
 S3_TRANSFER_KEY=$(KERNEL_NAME)_xfer
 
-XOCC=xocc
+VPP=v++
 CC=g++
 
 
@@ -409,11 +409,11 @@ HOST_EXE=host
 
 #Kernel
 KERNEL_SRC=
-# Flags for xocc (include -I <file> args).
+# Flags for VPP (include -I <file> args).
 KERNEL_FLAGS=
 KERNEL_EXE=$(KERNEL_NAME)
 
-#Custom flag to give to xocc
+#Custom flag to give to VPP
 KERNEL_LDCLFLAGS=--nk $(KERNEL_NAME):1 \
 	--xp param:compiler.preserveHlsOutput=1 \
 	--max_memory_ports $(KERNEL_NAME) \
@@ -567,7 +567,7 @@ endif
 define with_secret
 	@# Echo command without secrets (requires proper quoting)
 	@echo '$(subst $(SPACE)*****$(SPACE),*****,$(patsubst {{{%}}},*****,$(subst $(SINGLE_QUOTE),'"$(SINGLE_QUOTE)"',$1)))'
-	@$(subst }}}$(SPACE),,$(subst $(SPACE){{{,,$1))
+	
 endef
 
 .PHONY: nothing
@@ -639,18 +639,18 @@ ifeq ($(BUILD_TARGET),sw)
 #sw target
 $(DEST_DIR)/$(HOST_EXE): $(SW_SRC) $(SW_HDRS)
 	mkdir -p $(DEST_DIR)
-	cp sdaccel.ini $(DEST_DIR)
+	cp xrt.ini $(DEST_DIR)
 	$(CC) $(SW_SRC) $(SW_CFLAGS) $(SW_LFLAGS) -o $(DEST_DIR)/$(HOST_EXE)
 # Host for debug.
 $(DEST_DIR)/$(HOST_EXE)_debug: $(SW_SRC) $(SW_HDRS)
 	mkdir -p $(DEST_DIR)
-	cp sdaccel.ini $(DEST_DIR)
+	cp xrt.ini $(DEST_DIR)
 	$(CC) $(SW_SRC) $(SW_CFLAGS) -Og -ggdb -DDEBUG $(SW_LFLAGS) -o $(DEST_DIR)/$(HOST_EXE)_debug
 else
 #sim target
 $(DEST_DIR)/verilator/V$(KERNEL_NAME)_kernel.cpp: $(SV_SRC) $(SV_FROM_TLV) $(VH_SRC) $(FRAMEWORK_V_SRC)
 	mkdir -p $(DEST_DIR)
-	cp sdaccel.ini $(DEST_DIR)
+	cp xrt.ini $(DEST_DIR)
 	$(VERILATOR) --cc --sv --trace --top-module $(KERNEL_NAME)_kernel -DFPGA_WEBSERVER_KERNEL $(SV_SRC) $(SV_FROM_TLV) -y ../out/sv -y ../fpga/src -y $(FRAMEWORK_DIR)/fpga/src --Mdir $(DEST_DIR)/verilator \
 	|| (STATUS=$$? && mv $(DEST_DIR)/verilator/V$(KERNEL_NAME)_kernel.cpp $(DEST_DIR)/verilator/V$(KERNEL_NAME)_kernel.cpp.error && exit $$STATUS)  # to force re-run.
 $(DEST_DIR)/$(HOST_EXE): $(SIM_SRC) $(SIM_HDRS) $(DEST_DIR)/verilator/V$(KERNEL_NAME)_kernel.cpp
@@ -661,14 +661,14 @@ $(DEST_DIR)/$(HOST_EXE): $(SIM_SRC) $(SIM_HDRS) $(DEST_DIR)/verilator/V$(KERNEL_
 # Host for debug.
 #$(DEST_DIR)/$(HOST_EXE)_debug: $(SW_SRC) $(SW_HDRS)
 #	mkdir -p $(DEST_DIR)
-#	cp sdaccel.ini $(DEST_DIR)
+#	cp xrt.ini $(DEST_DIR)
 #	$(CC) $(SW_SRC) $(SW_CFLAGS) -Og -ggdb -DDEBUG $(SW_LFLAGS) -o $(DEST_DIR)/$(HOST_EXE)_debug
 endif
 else
 #hw and hw_emu target
 $(DEST_DIR)/$(HOST_EXE): $(HOST_SRC) $(HOST_HDRS)
 	mkdir -p $(DEST_DIR)
-	cp sdaccel.ini $(DEST_DIR)
+	cp xrt.ini $(DEST_DIR)
 	$(CC) $(HOST_SRC) $(HOST_CFLAGS) $(HOST_LFLAGS) -o $(DEST_DIR)/$(HOST_EXE)
 endif
 
@@ -775,7 +775,7 @@ $(USER_KERNEL_ADDED_FILE): $(SHELL_REP) $(SV_FROM_TLV)
 
 #$(DEST_DIR)/$(KERNEL_EXE).xo:
 #	mkdir -p $(DEST_DIR)
-#	$(XOCC) --platform $(AWS_PLATFORM) --target $(BUILD_TARGET) --compile --include $(KERNEL_HDRS) --save-temps $(REPORT) --kernel $(KERNEL_NAME) $(KERNEL_SRC) $(KERNEL_LDCLFLAGS) $(KERNEL_FLAGS) $(KERNEL_ADDITIONAL_FLAGS) --output $(DEST_DIR)/$(KERNEL_EXE).xo
+#	$(VPP) --platform $(AWS_PLATFORM) --target $(BUILD_TARGET) --compile --include $(KERNEL_HDRS) --save-temps $(REPORT) --kernel $(KERNEL_NAME) $(KERNEL_SRC) $(KERNEL_LDCLFLAGS) $(KERNEL_FLAGS) $(KERNEL_ADDITIONAL_FLAGS) --output $(DEST_DIR)/$(KERNEL_EXE).xo
 #	#cp ../fpga/mandelbrot_hw/sdx_imports/$(KERNEL_EXE).xo $(DEST_DIR)/$(KERNEL_EXE).xo
 
 # Package the project as an .xo.
@@ -801,7 +801,7 @@ project: $(USER_KERNEL_ADDED_FILE)
 
 
 $(DEST_DIR)/$(KERNEL_EXE).xclbin: $(XO_FILE)
-	cd $(DEST_DIR);	$(XOCC) -g --platform $(AWS_PLATFORM) --profile_kernel data:all:all:all --target $(BUILD_TARGET) --link --optimize 2 --save-temps $(REPORT) --kernel $(KERNEL_NAME) ../../$(XO_FILE) --output $(KERNEL_EXE).xclbin
+	cd $(DEST_DIR);	$(VPP) -g --platform $(AWS_PLATFORM) --profile_kernel data:all:all:all --target $(BUILD_TARGET) --link --optimize 2 --save-temps $(REPORT) --kernel $(KERNEL_NAME) ../../$(XO_FILE) --output $(KERNEL_EXE).xclbin
 
 # Create the AFI.
 # The steps are:

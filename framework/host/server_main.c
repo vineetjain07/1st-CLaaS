@@ -1,6 +1,6 @@
 /*
 BSD 3-Clause License
-
+%ROWS
 Copyright (c) 2018, alessandrocomodi
 All rights reserved.
 
@@ -127,7 +127,7 @@ int HostApp::server_main(int argc, char const *argv[], const char *kernel_name)
   #ifdef OPENCL
     // Platform initialization. These can also be initiated by commands over the socket (though I'm not sure how important that is).
     init_platform(NULL);
-    init_kernel(NULL, xclbin, kernel_name, ROWS * sizeof(int));  // TODO: size = ROWS.
+    init_kernel(NULL, xclbin, kernel_name, COLS * ROWS * sizeof(int));  // TODO: size = ROWS.
   #endif
 
   #ifdef KERNEL_AVAIL
