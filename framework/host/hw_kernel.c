@@ -39,19 +39,29 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 **
 */
 
+#define CL_USE_DEPRECATED_OPENCL_1_2_APIS
+
 #include <fcntl.h>
 #include <stdio.h>
+#include <iostream>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#ifdef _WINDOWS
+#include <io.h>
+#else
 #include <unistd.h>
+#include <sys/time.h>
+#endif
 #include <assert.h>
 #include <stdbool.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/time.h>
-#include "kernel.h"
 #include <CL/opencl.h>
+#include <CL/cl_ext.h>
+#include "xclhal2.h"
+
+#include "kernel.h"
 
 #include "server_main.h"
 
@@ -142,7 +152,7 @@ void HW_Kernel::initialize_platform() {
   }
 
   // Creation a command commands
-  commands = clCreateCommandQueue(context, device_id, 0, &err);
+  commands = clCreateCommandQueue(context, device_id, CL_QUEUE_PROFILING_ENABLE, &err);
   if (!commands) {
     perror("Error: Failed to create a command commands!\nTest failed\n");
     return;
@@ -172,7 +182,8 @@ void HW_Kernel::initialize_kernel(const char *xclbin, const char *kernel_name, i
   program = clCreateProgramWithBinary(context, 1, &device_id, &n0,
                                       (const unsigned char **) &kernelbinary, &status, &err);
   // TODO: Looks like kernelbinary is never deallocated. What's the right behavior, here?
-
+  free(kernelbinary);
+  
   if ((!program) || (err!=CL_SUCCESS)) {
     perror("Error: Failed to create a compute program binary!\nTest failed\n");
     return;
