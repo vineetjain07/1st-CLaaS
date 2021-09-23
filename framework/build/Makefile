@@ -97,12 +97,12 @@
 #     PORT: The port on which to launch the web server.
 #     TARGET=[hw, hw_emu, sim, sw] (determined by platform by default)
 #             hw: F1 FPGA.
-#             hw_emu: SDAccel hardware emulation compilation.
+#             hw_emu: Vitis hardware emulation compilation.
 #             sim: Verilator simulation of the kernel.
 #             sw: software-only with no kernel behavior available.
 #            TARGET is downgraded automatically based on the platform.
 #     PREBUILT=[true] or default to false behavior. True to use the prebuilt files in the repository, rather than building.
-#     WAVES=[true] or default to false behavior. True to generate waveforms. (VPP )
+#     WAVES=[true] or default to false behavior. True to generate waveforms. (v++ )
 #     VALGRIND=[true] or default to false behavior. True to use Valgrind to identify memory leaks in the host application.
 #     NOHUP=true: Can be used with 'launch' target to launch in background and stay running after the shell exits. (This is implied by 'make live').
 #     LAUNCH_ID: Used by launch, live, and dead targets. If unassigned, these targets assume a single running microservice.
@@ -248,13 +248,13 @@ VERILATOR_ROOT=$(ABS_REPO)/local/verilator
 VERILATOR_INCLUDE=$(ABS_REPO)/local/verilator/include
 endif
 ifneq ($(AWS_FPGA_REPO_DIR),)
-ifneq ($(findstring f1.,$(shell curl http://169.254.169.254/latest/meta-data/instance-type)),)
+#ifneq ($(findstring f1.,$(shell curl http://169.254.169.254/latest/meta-data/instance-type)),)
 # F1
 SUPPORTED_TARGETS :=hw | hw_emu |$(SPACE)
 else
 SUPPORTED_TARGETS :=hw_emu |$(SPACE)
 endif
-endif
+#endif
 
 ifneq ($(VERILATOR),)
 # Verilator.
@@ -419,11 +419,7 @@ KERNEL_LDCLFLAGS=--nk $(KERNEL_NAME):1 \
 	--max_memory_ports $(KERNEL_NAME) \
 	--memory_port_data_width $(KERNEL_NAME):512 \
 
-KERNEL_ADDITIONAL_FLAGS= --xp vivado_prop:run.my_rm_synth_1.{STEPS.SYNTH_DESIGN.ARGS.FLATTEN_HIERARCHY}={rebuilt} \
-	--xp vivado_prop:run.my_rm_synth_1.{STEPS.SYNTH_DESIGN.ARGS.DIRECTIVE}={AlternateRoutability} \
-	--xp vivado_prop:run.my_rm_synth_1.{STEPS.SYNTH_DESIGN.ARGS.GATED_CLOCK_CONVERSION}={off} \
-	--xp vivado_prop:run.my_rm_synth_1.{STEPS.SYNTH_DESIGN.ARGS.BUFG}={12} \
-	--xp vivado_prop:run.my_rm_synth_1.{STEPS.SYNTH_DESIGN.ARGS.FANOUT_LIMIT}={500} \
+KERNEL_ADDITIONAL_FLAGS=
 
 #Device to be used
 TARGET_DEVICE=xilinx:aws-vu9p-f1:4ddr-xpr-2pr:4.0
@@ -460,6 +456,7 @@ UNDERSCORE:= _
 DEST_SUBDIR=$(BUILD_TARGET)/$(subst $(PERIOD),$(UNDERSCORE),$(TARGET_DEVICE))
 DEST_DIR=../$(OUT_DIR_NAME)/$(DEST_SUBDIR)
 BUILD_DIR=../$(BUILD_DIR_NAME)/$(DEST_SUBDIR)
+XRT_INI_FILE=$(FRAMEWORK_DIR)/fpga/scripts/tcl/xrt.ini
 endif
 
 ifndef XILINX_XRT
@@ -552,7 +549,7 @@ HOST_CMD=$(VALGRIND_PREFIX) $(HOST_EXE_PATH) $(HOST_ARGS)
 endif
 ifeq ($(BUILD_TARGET),hw_emu)
 BUILD_TARGETS=$(BUILD_DIR)/$(HOST_EXE) $(HOST_XCLBIN)
-HOST_CMD=export XCL_EMULATION_MODE=$(BUILD_TARGET) && $(XILINX_SDX)/bin/emconfigutil --od $(DEST_DIR) --nd 1  --platform $(AWS_PLATFORM) && $(VALGRIND_PREFIX) $(HOST_EXE_PATH) $(HOST_ARGS) $(HOST_XCLBIN)
+HOST_CMD=export XCL_EMULATION_MODE=$(BUILD_TARGET) && $(XILINX_VITIS)/bin/emconfigutil --od $(DEST_DIR) --nd 1  --platform $(AWS_PLATFORM) && $(VALGRIND_PREFIX) $(HOST_EXE_PATH) $(HOST_ARGS) $(HOST_XCLBIN)
 endif
 ifeq ($(BUILD_TARGET),hw)
 BUILD_TARGETS=$(BUILD_DIR)/$(HOST_EXE) $(HOST_XCLBIN)
@@ -567,7 +564,7 @@ endif
 define with_secret
 	@# Echo command without secrets (requires proper quoting)
 	@echo '$(subst $(SPACE)*****$(SPACE),*****,$(patsubst {{{%}}},*****,$(subst $(SINGLE_QUOTE),'"$(SINGLE_QUOTE)"',$1)))'
-	
+	@$(subst }}}$(SPACE),,$(subst $(SPACE){{{,,$1))
 endef
 
 .PHONY: nothing
@@ -639,18 +636,18 @@ ifeq ($(BUILD_TARGET),sw)
 #sw target
 $(DEST_DIR)/$(HOST_EXE): $(SW_SRC) $(SW_HDRS)
 	mkdir -p $(DEST_DIR)
-	cp xrt.ini $(DEST_DIR)
+	cp $(XRT_INI_FILE) $(DEST_DIR)
 	$(CC) $(SW_SRC) $(SW_CFLAGS) $(SW_LFLAGS) -o $(DEST_DIR)/$(HOST_EXE)
 # Host for debug.
 $(DEST_DIR)/$(HOST_EXE)_debug: $(SW_SRC) $(SW_HDRS)
 	mkdir -p $(DEST_DIR)
-	cp xrt.ini $(DEST_DIR)
+	cp $(XRT_INI_FILE) $(DEST_DIR)
 	$(CC) $(SW_SRC) $(SW_CFLAGS) -Og -ggdb -DDEBUG $(SW_LFLAGS) -o $(DEST_DIR)/$(HOST_EXE)_debug
 else
 #sim target
 $(DEST_DIR)/verilator/V$(KERNEL_NAME)_kernel.cpp: $(SV_SRC) $(SV_FROM_TLV) $(VH_SRC) $(FRAMEWORK_V_SRC)
 	mkdir -p $(DEST_DIR)
-	cp xrt.ini $(DEST_DIR)
+	cp $(XRT_INI_FILE) $(DEST_DIR)
 	$(VERILATOR) --cc --sv --trace --top-module $(KERNEL_NAME)_kernel -DFPGA_WEBSERVER_KERNEL $(SV_SRC) $(SV_FROM_TLV) -y ../out/sv -y ../fpga/src -y $(FRAMEWORK_DIR)/fpga/src --Mdir $(DEST_DIR)/verilator \
 	|| (STATUS=$$? && mv $(DEST_DIR)/verilator/V$(KERNEL_NAME)_kernel.cpp $(DEST_DIR)/verilator/V$(KERNEL_NAME)_kernel.cpp.error && exit $$STATUS)  # to force re-run.
 $(DEST_DIR)/$(HOST_EXE): $(SIM_SRC) $(SIM_HDRS) $(DEST_DIR)/verilator/V$(KERNEL_NAME)_kernel.cpp
@@ -661,14 +658,14 @@ $(DEST_DIR)/$(HOST_EXE): $(SIM_SRC) $(SIM_HDRS) $(DEST_DIR)/verilator/V$(KERNEL_
 # Host for debug.
 #$(DEST_DIR)/$(HOST_EXE)_debug: $(SW_SRC) $(SW_HDRS)
 #	mkdir -p $(DEST_DIR)
-#	cp xrt.ini $(DEST_DIR)
+#	cp $(XRT_INI_FILE) $(DEST_DIR)
 #	$(CC) $(SW_SRC) $(SW_CFLAGS) -Og -ggdb -DDEBUG $(SW_LFLAGS) -o $(DEST_DIR)/$(HOST_EXE)_debug
 endif
 else
 #hw and hw_emu target
 $(DEST_DIR)/$(HOST_EXE): $(HOST_SRC) $(HOST_HDRS)
 	mkdir -p $(DEST_DIR)
-	cp xrt.ini $(DEST_DIR)
+	cp $(XRT_INI_FILE) $(DEST_DIR)
 	$(CC) $(HOST_SRC) $(HOST_CFLAGS) $(HOST_LFLAGS) -o $(DEST_DIR)/$(HOST_EXE)
 endif
 
@@ -713,7 +710,7 @@ ifeq ($(USE_XILINX),true)
 # Actually, I think it would be better to include BUILD_TARGET in the build target, eg: sw_host, hw_host, etc. (As it is, there is
 # redundant building for different targets).
 
-VIVADO_VERSION_MESSAGE=Note: Kernel construction assumes Vivado v2018.3
+VIVADO_VERSION_MESSAGE=Note: Kernel construction assumes Vivado v2021.1
 
 # Create tcl script for the kernel configuration
 $(DEST_DIR)/rtl_kernel_wiz.tcl: $(FRAMEWORK_DIR)/fpga/scripts/produce_tcl_file.py $(HW_SHELL_CONFIG_JSON)
@@ -740,8 +737,8 @@ $(SHELL_REP): $(DEST_DIR)/rtl_kernel_wiz.tcl
 #   We need backpressure between rd_fifo and kernel and kernel and wr_fifo.
 #   The sed commands apply the changes.
 # Creates a kernel_added.flag file to signify completion.
-# TODO: How do we create the SDAccel workspace and project? Makefile or in repo or via instructions?
-# TODO: How do we configure the Vivado SDAccel project, including low-optimizations. Makefile or in repo or via instructions?
+# TODO: How do we create the Vitis workspace and project? Makefile or in repo or via instructions?
+# TODO: How do we configure the Vivado Vitis project, including low-optimizations. Makefile or in repo or via instructions?
 IMPORTS_DIR=$(DEST_DIR)/$(KERNEL_NAME)_ex/imports
 VADD_SV=$(IMPORTS_DIR)/$(KERNEL_NAME)_example_vadd.sv
 VIVADO_PROJ_SCRIPT=$(DEST_DIR)/add_to_project.tcl
@@ -854,7 +851,7 @@ awsxclbin: $(HOST_XCLBIN)
 afi: awsxclbin
 endif
 
-# TODO: Need sdx_project and sdx_workspace targets to build SDx workspace/project configured to work w/ the host application.
+# TODO: Need vitis_project and vitis_workspace targets to build Vitis workspace/project configured to work w/ the host application.
 
 
 # For production use of port 80.
@@ -1092,3 +1089,4 @@ list_setups:
 copy_app:
 	if [[ -n '$(APP_NAME)' ]]; then $(REPO)/bin/copy_app '$(KERNEL_NAME)' '$(APP_NAME)'; else echo -e '\e[91m\e[1mAPP_NAME must be provided.\e[0m'; fi
 	
+

@@ -62,6 +62,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endif
 #ifdef OPENCL
 #include <CL/opencl.h>
+#include <CL/cl_ext.h>
 #include "kernel.h"
 #include "hw_kernel.h"
 #endif
@@ -71,6 +72,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
+
 
 #define STR_VALUE(arg) #arg
 #define GET_STRING(name) STR_VALUE(name)
