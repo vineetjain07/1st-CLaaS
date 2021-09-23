@@ -123,17 +123,19 @@ int HostApp::server_main(int argc, char const *argv[], const char *kernel_name)
     exit(1);
   }
 
-
+  cout << "before init_platform" << endl;
   #ifdef OPENCL
     // Platform initialization. These can also be initiated by commands over the socket (though I'm not sure how important that is).
     init_platform(NULL);
+    cout << "before inits kernel" << endl;
     init_kernel(NULL, xclbin, kernel_name, COLS * ROWS * sizeof(int));  // TODO: size = ROWS.
+    cout << "after init kernel" << endl;
   #endif
-
+  cout << "before reset kernel" << endl;
   #ifdef KERNEL_AVAIL
     kernel.reset_kernel();
   #endif
-
+  cout << "after reset kernel" << endl;
 
   // Main HOST loop
   // Currently START_KERNEL wont be working as web-scoket terminates
@@ -146,7 +148,7 @@ int HostApp::server_main(int argc, char const *argv[], const char *kernel_name)
 
     int loop_cnt = 0;
     while(true) {
-      //cout << "C++ Main loop" << endl;
+      cout << "C++ Main loop" << endl;
       loop_cnt++;
       if (loop_cnt > 10000) {
         if (verbosity > 5) {cout << "." << flush;}
@@ -162,10 +164,11 @@ int HostApp::server_main(int argc, char const *argv[], const char *kernel_name)
 
 void HostApp::processTraffic() {
   int command;
+  cout << "processTrafic" << endl;
 
   string msg = socket_recv_string("command");
 
-  //cout << "Main loop" << "Msg: " << msg << endl;
+  cout << "Main loop" << "Msg: " << msg << endl;
 
   // Translate message to an integer
   command = get_command(msg.c_str());
@@ -261,7 +264,7 @@ void HostApp::processTraffic() {
             socket_send("DATA response", s);
 
           } free(int_resp_data_p); free(int_data_p);
-        } catch (nlohmann::detail::exception) {
+        } catch (nlohmann::detail::exception const&) {
           cerr_line() << "Unable to process DATA message." << endl;
           exit(1);
         }
@@ -445,6 +448,7 @@ void HostApp::init_kernel(char * response, const char *xclbin, const char *kerne
   } else {
     if(!kernel.initialized) {
       kernel.initialize_kernel(xclbin, kernel_name, memory_size);
+      printf("kernel.init in servermain.c\n");
       if (kernel.status)
         sprintf(response, "Error: Could not initialize the kernel");
       else {

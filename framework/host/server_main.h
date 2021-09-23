@@ -33,7 +33,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef SERVER_MAIN
 #define SERVER_MAIN
 
-
+#define CL_USE_DEPRECATED_OPENCL_1_2_APIS
+//#define CL_TARGET_OPENCL_VERSION 120
 
 #include <fcntl.h>
 #include <cstdio>
@@ -77,8 +78,8 @@ using json = nlohmann::json;
 #define STR_VALUE(arg) #arg
 #define GET_STRING(name) STR_VALUE(name)
 
-#if defined(SDX_PLATFORM) && !defined(TARGET_DEVICE)
-#define TARGET_DEVICE GET_STRING(SDX_PLATFORM)
+#if defined(VITIS_PLATFORM) && !defined(TARGET_DEVICE)
+#define TARGET_DEVICE GET_STRING(VITIS_PLATFORM)
 #endif
 
 #undef KERNEL_NAME

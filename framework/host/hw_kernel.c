@@ -40,6 +40,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #define CL_USE_DEPRECATED_OPENCL_1_2_APIS
+//#define CL_TARGET_OPENCL_VERSION 120
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -47,18 +48,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#ifdef _WINDOWS
-#include <io.h>
-#else
 #include <unistd.h>
 #include <sys/time.h>
-#endif
 #include <assert.h>
 #include <stdbool.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <CL/opencl.h>
-#include <CL/cl_ext.h>
+//#include <CL/cl_ext.h>
 //#include "xclhal2.h"
 
 #include "kernel.h"
@@ -152,7 +149,7 @@ void HW_Kernel::initialize_platform() {
   }
 
   // Creation a command commands
-  commands = clCreateCommandQueue(context, device_id, CL_QUEUE_PROFILING_ENABLE, &err);
+  commands = clCreateCommandQueue(context, device_id, 0, &err);
   if (!commands) {
     perror("Error: Failed to create a command commands!\nTest failed\n");
     return;
@@ -177,12 +174,14 @@ void HW_Kernel::initialize_kernel(const char *xclbin, const char *kernel_name, i
     return;
   }
   size_t n0 = n_i0;
-
+  printf("before clcreate\n");
   // Create the compute program from offline
   program = clCreateProgramWithBinary(context, 1, &device_id, &n0,
                                       (const unsigned char **) &kernelbinary, &status, &err);
+  printf("%d\n",err);
   // TODO: Looks like kernelbinary is never deallocated. What's the right behavior, here?
-  free(kernelbinary);
+  printf("Done clCreate\n");
+  //free(kernelbinary);
   
   if ((!program) || (err!=CL_SUCCESS)) {
     perror("Error: Failed to create a compute program binary!\nTest failed\n");
@@ -215,10 +214,10 @@ void HW_Kernel::initialize_kernel(const char *xclbin, const char *kernel_name, i
   // This must be modified by the user if the number (or name) of the arguments is different from this
   // application
   //
-  // Create structs to define memory bank mapping
-
-  read_mem  = clCreateBuffer(context, CL_MEM_READ_ONLY ,  sizeof(int) * memory_size, NULL, &err);
-  write_mem = clCreateBuffer(context, CL_MEM_WRITE_ONLY,  sizeof(int) * memory_size, NULL, &err);
+  //read_mem  = clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(int) * memory_size, NULL, NULL);
+  //write_mem = read_mem;
+  read_mem  = clCreateBuffer(context, CL_MEM_READ_ONLY ,  sizeof(int) * memory_size, NULL, NULL);  // TODO: Fix memory_size.
+  write_mem = clCreateBuffer(context, CL_MEM_WRITE_ONLY,  sizeof(int) * memory_size, NULL, NULL);
 
   if (!(write_mem) || !(read_mem)) {
     perror("Error: Failed to allocate device memory!\nTest failed\n");
