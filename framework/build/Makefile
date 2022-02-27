@@ -427,10 +427,10 @@ TARGET_DEVICE=xilinx:aws-vu9p-f1:4ddr-xpr-2pr:4.0
 
 REPORT=
 ifeq ($(BUILD_TARGET),hw)
-REPORT=
+REPORT= --report_level 2
 else
 ifeq ($(BUILD_TARGET),hw_emu)
-REPORT=
+REPORT= --report_level 2
 endif
 endif
 
@@ -797,7 +797,7 @@ project: $(USER_KERNEL_ADDED_FILE)
 
 
 $(DEST_DIR)/$(KERNEL_EXE).xclbin: $(XO_FILE)
-	cd $(DEST_DIR);	$(VPP) -g --platform $(AWS_PLATFORM) --profile_kernel data:all:all:all --target $(BUILD_TARGET) --link --optimize 2 --save-temps $(REPORT) --kernel $(KERNEL_NAME) ../../$(XO_FILE) --output $(KERNEL_EXE).xclbin
+	cd $(DEST_DIR);	$(VPP) -g --platform $(AWS_PLATFORM) --profile.data all:all:all --target $(BUILD_TARGET) --link --optimize quick --save-temps $(REPORT) --kernel $(KERNEL_NAME) ../../$(XO_FILE) --output $(KERNEL_EXE).xclbin
 
 # Create the AFI.
 # The steps are:
