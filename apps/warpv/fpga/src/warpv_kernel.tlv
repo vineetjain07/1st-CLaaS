@@ -1,4 +1,4 @@
-\m4_TLV_version 1d --fmtFlatSignals --bestsv --noline: tl-x.org
+\m4_TLV_version 1d --noline --debugSigs: tl-x.org
 \SV
 // -----------------------------------------------------------------------------
 // Copyright (c) 2019, Steven F. Hoover
@@ -27,6 +27,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // -----------------------------------------------------------------------------
 
+// For Verilator \m4_TLV_version 1d --fmtFlatSignals --bestsv --noline: tl-x.org
 // For Xilinx: \m4_TLV_version 1d --fmtFlatSignals --bestsv --noline: tl-x.org
 
 // Overview:
@@ -103,7 +104,7 @@ m4+definitions(['
    m4_def(MEM_WR_STAGE, 3)
    m4_def(LD_RETURN_ALIGN, 4)
 
-   m4_define(['M4_XILINX'], 1)
+   m4_define(['M4_XILINX'], 0)
 
    m4_include_url(['https://raw.githubusercontent.com/stevehoover/tlv_flow_lib/7a2b37cc0ccd06bc66984c37e17ceb970fd6f339/pipeflow_lib.tlv'])
    m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_flow_lib/5a8c0387be80b2deccfcd1506299b36049e0663e/arrays.tlv'])
