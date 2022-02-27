@@ -1,6 +1,6 @@
 /*
 BSD 3-Clause License
-%ROWS
+
 Copyright (c) 2018, alessandrocomodi
 All rights reserved.
 
