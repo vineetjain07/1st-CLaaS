@@ -241,7 +241,6 @@ ifeq ($(VERILATOR),)
 # No local verilator.
 VERILATOR=$(shell which verilator 2> /dev/null)
 # Presumable verilator is /usr/local/bin/verilator or /usr/bin/verilator (but there is no check).
-#VERILATOR_INCLUDE=/usr/share/verilator/include
 # Find the include directory relative to the binary.
 VERILATOR_INCLUDE=$(subst bin/verilator,share/verilator/include,$(VERILATOR))
 else
